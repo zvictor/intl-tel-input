@@ -61,9 +61,11 @@ https://github.com/Bluefieldscom/intl-tel-input.git
         this._defaults = defaults;
         // event namespace
         this.ns = "." + pluginName + id++;
+        this.telInput = $(element);
+        this.isInput = this.telInput.is("input");
         // Chrome, FF, Safari, IE9+
         this.isGoodBrowser = Boolean(element.setSelectionRange);
-        this.hadInitialPlaceholder = Boolean($(element).attr("placeholder"));
+        this.hadInitialPlaceholder = Boolean(this.telInput.attr("placeholder"));
         this._name = pluginName;
         this.init();
     }
@@ -81,6 +83,7 @@ https://github.com/Bluefieldscom/intl-tel-input.git
             }
         },
         ready: function() {
+            var that = this;
             // if in nationalMode, disable options relating to dial codes
             if (this.options.nationalMode) {
                 this.options.autoHideDialCode = false;
@@ -99,8 +102,22 @@ https://github.com/Bluefieldscom/intl-tel-input.git
             this._generateMarkup();
             // set the initial state of the input value and the selected flag
             this._setInitialState();
-            // start all of the event listeners: autoHideDialCode, input keydown, selectedFlag click
-            this._initListeners();
+            if (this.isInput) {
+                // start all of the event listeners: autoHideDialCode, input keydown, selectedFlag click
+                this._initListeners();
+            }
+            // if the user has specified the path to the utils script, fetch it on window.load
+            if (this.options.utilsScript) {
+                // if the plugin is being initialised after the window.load event has already been fired
+                if (windowLoaded) {
+                    this.loadUtils();
+                } else {
+                    // wait until the load event so we don't block any other requests e.g. the flags image
+                    $(window).load(function() {
+                        that.loadUtils();
+                    });
+                }
+            }
         },
         /********************
    *  PRIVATE METHODS
@@ -163,46 +180,51 @@ https://github.com/Bluefieldscom/intl-tel-input.git
         },
         // generate all of the markup for the plugin: the selected flag overlay, and the dropdown
         _generateMarkup: function() {
-            // telephone input
-            this.telInput = $(this.element);
+            this.telInput.addClass("ini-number");
             // containers (mostly for positioning)
             this.telInput.wrap($("<div>", {
                 "class": "intl-tel-input"
             }));
-            var flagsContainer = $("<div>", {
-                "class": "flag-dropdown"
-            }).insertAfter(this.telInput);
-            // currently selected flag (displayed to left of input)
-            var selectedFlag = $("<div>", {
-                "class": "selected-flag"
-            }).appendTo(flagsContainer);
+            var flagParent;
+            if (this.isInput) {
+                var flagsContainer = $("<div>", {
+                    "class": "flag-dropdown"
+                }).insertAfter(this.telInput);
+                // currently selected flag (displayed to left of input)
+                flagParent = $("<div>", {
+                    "class": "selected-flag"
+                }).appendTo(flagsContainer);
+                // CSS triangle
+                $("<div>", {
+                    "class": "arrow"
+                }).appendTo(this.selectedFlagInner);
+                // country list contains: preferred countries, then divider, then all countries
+                this.countryList = $("<ul>", {
+                    "class": "country-list v-hide"
+                }).appendTo(flagsContainer);
+                if (this.preferredCountries.length) {
+                    this._appendListItems(this.preferredCountries, "preferred");
+                    $("<li>", {
+                        "class": "divider"
+                    }).appendTo(this.countryList);
+                }
+                this._appendListItems(this.countries, "");
+                // now we can grab the dropdown height, and hide it properly
+                this.dropdownHeight = this.countryList.outerHeight();
+                this.countryList.removeClass("v-hide").addClass("hide");
+                // and set the width
+                if (this.options.responsiveDropdown) {
+                    this.countryList.outerWidth(this.telInput.outerWidth());
+                }
+                // this is useful in lots of places
+                this.countryListItems = this.countryList.children(".country");
+            } else {
+                flagParent = this.telInput.parent();
+                flagParent.addClass("ini-display");
+            }
             this.selectedFlagInner = $("<div>", {
                 "class": "flag"
-            }).appendTo(selectedFlag);
-            // CSS triangle
-            $("<div>", {
-                "class": "arrow"
-            }).appendTo(this.selectedFlagInner);
-            // country list contains: preferred countries, then divider, then all countries
-            this.countryList = $("<ul>", {
-                "class": "country-list v-hide"
-            }).appendTo(flagsContainer);
-            if (this.preferredCountries.length) {
-                this._appendListItems(this.preferredCountries, "preferred");
-                $("<li>", {
-                    "class": "divider"
-                }).appendTo(this.countryList);
-            }
-            this._appendListItems(this.countries, "");
-            // now we can grab the dropdown height, and hide it properly
-            this.dropdownHeight = this.countryList.outerHeight();
-            this.countryList.removeClass("v-hide").addClass("hide");
-            // and set the width
-            if (this.options.responsiveDropdown) {
-                this.countryList.outerWidth(this.telInput.outerWidth());
-            }
-            // this is useful in lots of places
-            this.countryListItems = this.countryList.children(".country");
+            }).appendTo(flagParent);
         },
         // add a country <li> to the countryList <ul> container
         _appendListItems: function(countries, className) {
@@ -226,7 +248,7 @@ https://github.com/Bluefieldscom/intl-tel-input.git
         },
         // set the initial state of the input value and the selected flag
         _setInitialState: function() {
-            var val = this.telInput.val();
+            var val = this.isInput ? this.telInput.val() : this.telInput.text();
             // if there is a number, and it's valid, we can go ahead and set the flag, else fall back to default
             if (this._getDialCode(val)) {
                 this._updateFlagFromNumber(val);
@@ -280,19 +302,8 @@ https://github.com/Bluefieldscom/intl-tel-input.git
                     that._showDropdown();
                 }
             });
-            // if the user has specified the path to the utils script, fetch it on window.load
-            if (this.options.utilsScript) {
-                // if the plugin is being initialised after the window.load event has already been fired
-                if (windowLoaded) {
-                    this.loadUtils();
-                } else {
-                    // wait until the load event so we don't block any other requests e.g. the flags image
-                    $(window).load(function() {
-                        that.loadUtils();
-                    });
-                }
-            }
         },
+        // listen for keyup (and keypress if autoFormat enabled)
         _initKeyListeners: function() {
             var that = this;
             if (this.options.autoFormat) {
@@ -575,7 +586,11 @@ https://github.com/Bluefieldscom/intl-tel-input.git
                 // no autoFormat, so just insert the original value
                 formatted = val;
             }
-            this.telInput.val(formatted);
+            if (this.isInput) {
+                this.telInput.val(formatted);
+            } else {
+                this.telInput.text(formatted);
+            }
         },
         // check if need to select a new flag based on the given number
         _updateFlagFromNumber: function(number) {
@@ -637,15 +652,17 @@ https://github.com/Bluefieldscom/intl-tel-input.git
             // do this first as it will throw an error and stop if countryCode is invalid
             this.selectedCountryData = this._getCountryData(countryCode, false, false);
             this.selectedFlagInner.attr("class", "flag " + countryCode);
-            // update the selected country's title attribute
-            var title = this.selectedCountryData.name + ": +" + this.selectedCountryData.dialCode;
-            this.selectedFlagInner.parent().attr("title", title);
-            // and the input's placeholder
-            this._updatePlaceholder();
-            // update the active list item
-            var listItem = this.countryListItems.children(".flag." + countryCode).first().parent();
-            this.countryListItems.removeClass("active");
-            listItem.addClass("active");
+            if (this.isInput) {
+                // update the selected country's title attribute
+                var title = this.selectedCountryData.name + ": +" + this.selectedCountryData.dialCode;
+                this.selectedFlagInner.parent().attr("title", title);
+                // and the input's placeholder
+                this._updatePlaceholder();
+                // update the active list item
+                var listItem = this.countryListItems.children(".flag." + countryCode).first().parent();
+                this.countryListItems.removeClass("active");
+                listItem.addClass("active");
+            }
         },
         // update the input placeholder to an example number from the currently selected country
         _updatePlaceholder: function() {
@@ -811,7 +828,7 @@ https://github.com/Bluefieldscom/intl-tel-input.git
                     url: utilsScript,
                     success: function() {
                         // tell all instances the utils are ready
-                        $(".intl-tel-input input").intlTelInput("utilsLoaded");
+                        $(".intl-tel-input .ini-number").intlTelInput("utilsLoaded");
                     },
                     dataType: "script",
                     cache: true
@@ -839,8 +856,9 @@ https://github.com/Bluefieldscom/intl-tel-input.git
         // this is called when the utils are ready
         utilsLoaded: function() {
             // if autoFormat is enabled and there's an initial value in the input, then format it
-            if (this.options.autoFormat && this.telInput.val()) {
-                this._updateVal(this.telInput.val());
+            var val = this.isInput ? this.telInput.val() : this.telInput.text();
+            if (this.options.autoFormat && val) {
+                this._updateVal(val);
             }
             this._updatePlaceholder();
         }

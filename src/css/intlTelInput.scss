@@ -68,6 +68,17 @@ $selectedFlagWidth: $flagWidth + $flagPadding + $arrowWidth + (2 * $arrowPadding
     margin-left: 0;
   }
 
+  &.ini-display {
+    .ini-number {
+      padding-left: $flagWidth + $flagPadding;
+    }
+    .flag {
+      position: absolute;
+      top: 50%;
+      margin-top: -1 * floor($flagHeight / 2);
+    }
+  }
+
   .flag-dropdown {
     // positioned over the top of the input
     position: absolute;
