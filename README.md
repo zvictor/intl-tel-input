@@ -93,7 +93,16 @@ Set the default country by it's country code. You can also set it to `"auto"`, w
 
 **geoipProvider**
 Type: `String` Default: `"freegeoip"`
-When setting `defaultCountry` to `"auto"`, we use a special service to provide us the location data of the given user. Currently we support three different values: "[freegeoip](https://freegeoip.net/)", "[telize](https://telize.com/)" and "[ipinfo](https://ipinfo.io/)".
+When setting `defaultCountry` to `"auto"`, we use a special service to provide us the location data of the given user. Currently we support three different third party apis: "[freegeoip](https://freegeoip.net/)", "[telize](https://telize.com/)" and "[ipinfo](https://ipinfo.io/)".
+
+You can also write a custom method to get the country code. For example
+```javascript
+geoipProvider: function(callback) {
+    $.get('http://ipinfo.io/json?token={token}').always(function(resp) {
+        callback(resp && resp['country'] || '');
+    });
+}
+```
 
 **geoipToken**
 Type: `String` Default: `""`
