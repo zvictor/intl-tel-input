@@ -1,5 +1,5 @@
 /*
-International Telephone Input v5.8.7
+International Telephone Input v5.9.0
 https://github.com/Bluefieldscom/intl-tel-input.git
 */
 // wrap in UMD - see https://github.com/umdjs/umd/blob/master/jqueryPlugin.js
@@ -356,21 +356,30 @@ https://github.com/Bluefieldscom/intl-tel-input.git
                         field: "country_code"
                     }
                 };
-                var provider = providers[this.options.geoipProvider];
-                var url = provider.url.replace("{token}", this.options.geoipToken || "");
-                // dont bother with the success function arg - instead use always() as should still set a defaultCountry even if the lookup fails
-                $.get(url).always(function(resp) {
-                    $.fn[pluginName].autoCountry = (resp && resp[provider.field] || "").toLowerCase();
-                    if ($.cookie) {
-                        $.cookie("itiAutoCountry", $.fn[pluginName].autoCountry, {
-                            path: "/"
-                        });
-                    }
-                    // tell all instances the auto country is ready
-                    // TODO: this should just be the current instances
-                    $(".intl-tel-input input").intlTelInput("autoCountryLoaded");
+                if (typeof this.options.geoipProvider === "function") {
+                    this.options.geoipProvider(function(resp) {
+                        this._autoCountryLoaded(resp);
+                    });
+                } else {
+                    var provider = providers[this.options.geoipProvider];
+                    var url = provider.url.replace("{token}", this.options.geoipToken || "");
+                    // dont bother with the success function arg - instead use always() as should still set a defaultCountry even if the lookup fails
+                    $.get(url).always(function(resp) {
+                        this._autoCountryLoaded(resp && resp[provider.field] || "");
+                    });
+                }
+            }
+        },
+        _autoCountryLoaded: function(country_code) {
+            $.fn[pluginName].autoCountry = country_code.toLowerCase();
+            if ($.cookie) {
+                $.cookie("itiAutoCountry", $.fn[pluginName].autoCountry, {
+                    path: "/"
                 });
             }
+            // tell all instances the auto country is ready
+            // TODO: this should just be the current instances
+            $(".intl-tel-input input").intlTelInput("autoCountryLoaded");
         },
         _initKeyListeners: function() {
             var that = this;
